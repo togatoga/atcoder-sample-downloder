@@ -35,7 +35,14 @@ async fn main() {
     let matches = clap::App::new("atcoder-sample-downloader")
         .version("1.0")
         .author("Hitoshi Togasaki. <togasakitogatoga+github.com>")
-        .about("Download sample test cases of AtCoder(https://atcoder.jp)")
+        .about(
+            "Download sample test cases of AtCoder problem
+Example:
+    //Download sample test cases
+    atcoder-sample-donwloader download https://atcoder.jp/contests/agc035/tasks/agc035_a
+    //Login AtCoder and save your session in your local
+    atcoder-sample-donwloader login",
+        )
         .subcommand(
             clap::SubCommand::with_name(&SubCommand::Download.value())
                 .about("Download sample test cases in your local")
