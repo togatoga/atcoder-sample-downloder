@@ -1,6 +1,7 @@
 extern crate clap;
 extern crate failure;
 extern crate reqwest;
+extern crate tokio;
 extern crate url;
 
 enum SubCommand {
@@ -16,32 +17,21 @@ impl SubCommand {
     }
 }
 
-async fn call_get_request(url: &str) -> Result<(), reqwest::Error> {
-    let res = reqwest::Client::new()
-        .get("https://hyper.rs")
-        .send()
-        .await?;
-
-    println!("Status: {}", res.status());
-
-    let body = res.text().await?;
-
-    println!("Body:\n\n{}", body);
-    Ok(())
-    // Ok(body)
+async fn get_html(url: &str) -> Result<String, reqwest::Error> {
+    let res = reqwest::Client::new().get(url).send().await?;
+    let html = res.text().await?;
+    Ok(html)
 }
 
-fn download(url: &str) -> Result<(), failure::Error> {
+async fn download(url: &str) -> Result<(), failure::Error> {
     let url = url::Url::parse(url)?;
-    println!("Call");
-    call_get_request(url.as_str()).await?;
-    println!("Called");
-    // println!("html {:?}", html);
-    // println!("{:?}", html.unwrap());
+    let html = get_html(url.as_str()).await?;
+    println!("{}", html);
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let matches = clap::App::new("atcoder-sample-downloader")
         .version("1.0")
         .author("Hitoshi Togasaki. <togasakitogatoga+github.com>")
@@ -63,8 +53,8 @@ fn main() {
 
     //run sub commands
     if let Some(ref matched) = matches.subcommand_matches(&SubCommand::Download.value()) {
-        match download(matched.value_of("url").unwrap()) {
-            Ok(()) => {}
+        match download(matched.value_of("url").unwrap()).await {
+            Ok(_) => {}
             Err(e) => {
                 println!("{:?}", e);
             }
