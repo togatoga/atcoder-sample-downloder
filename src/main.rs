@@ -1,6 +1,7 @@
 extern crate clap;
 extern crate failure;
 extern crate reqwest;
+extern crate scraper;
 extern crate tokio;
 extern crate url;
 
@@ -21,6 +22,11 @@ async fn get_html(url: &str) -> Result<String, reqwest::Error> {
     let res = reqwest::Client::new().get(url).send().await?;
     let html = res.text().await?;
     Ok(html)
+}
+
+fn parse_html(html: &str) -> scraper::Html {
+    let document = scraper::Html::parse_document(html);
+    document
 }
 
 async fn download(url: &str) -> Result<(), failure::Error> {
