@@ -29,6 +29,12 @@ fn parse_html(html: &str) -> scraper::Html {
     document
 }
 
+async fn login(url: &str) -> Result<(), failure::Error> {
+    let url = url::Url::parse(url)?;
+    println!("{}", url);
+    Ok(())
+}
+
 async fn download(url: &str) -> Result<(), failure::Error> {
     let url = url::Url::parse(url)?;
     let html = get_html(url.as_str()).await?;
@@ -60,13 +66,28 @@ Example:
         )
         .subcommand(
             clap::SubCommand::with_name(&SubCommand::Login.value())
-                .about("Login AtCoder and save session in your local"),
+                .about("Login AtCoder and save session in your local")
+                .arg(clap::Arg::with_name("url").help("A login URL of AtCoder")),
         )
         .get_matches();
 
     //run sub commands
     if let Some(ref matched) = matches.subcommand_matches(&SubCommand::Download.value()) {
         match download(matched.value_of("url").unwrap()).await {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{:?}", e);
+            }
+        }
+    }
+    if let Some(ref matched) = matches.subcommand_matches(&SubCommand::Login.value()) {
+        match login(
+            matched
+                .value_of("url")
+                .unwrap_or("https://atcoder.jp/login"),
+        )
+        .await
+        {
             Ok(_) => {}
             Err(e) => {
                 println!("{:?}", e);
