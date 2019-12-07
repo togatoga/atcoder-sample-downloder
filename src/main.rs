@@ -8,6 +8,8 @@ extern crate url;
 
 use itertools::Itertools;
 use selectors::Element;
+use std::io::Write;
+
 enum SubCommand {
     Download,
     Login,
@@ -35,6 +37,20 @@ fn parse_html(html: &str) -> scraper::Html {
 async fn login(url: &str) -> Result<(), failure::Error> {
     let url = url::Url::parse(url)?;
     println!("{}", url);
+    Ok(())
+}
+
+fn create_sample_test_files(test_cases: &[(String, String)]) -> Result<(), failure::Error> {
+    for (idx, (input, output)) in test_cases.iter().enumerate() {
+        //e.g sample_input_1.txt sample_output_1.txt
+        let input_file_name = format!("sample_input_{}.txt", idx + 1);
+        let mut input_file = std::fs::File::create(input_file_name)?;
+        input_file.write_all(input.as_bytes())?;
+
+        let output_file_name = format!("sample_output_{}.txt", idx + 1);
+        let mut output_file = std::fs::File::create(output_file_name)?;
+        output_file.write_all(output.as_bytes())?;
+    }
     Ok(())
 }
 
@@ -89,6 +105,7 @@ async fn download(url: &str) -> Result<(), failure::Error> {
     let html = get_html(url.as_str()).await?;
     let document = parse_html(&html);
     let sample_test_cases = parse_sample_cases(&document)?;
+    create_sample_test_files(&sample_test_cases)?;
     Ok(())
 }
 
