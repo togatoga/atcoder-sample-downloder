@@ -116,10 +116,11 @@ async fn main() {
         .author("Hitoshi Togasaki. <togasakitogatoga+github.com>")
         .about(
             "Download sample test cases of AtCoder problem
+
 Example:
-    //Download sample test cases
+    //Download
     atcoder-sample-donwloader download https://atcoder.jp/contests/agc035/tasks/agc035_a
-    //Login AtCoder and save your session in your local
+    //Login
     atcoder-sample-donwloader login",
         )
         .subcommand(
