@@ -1,13 +1,16 @@
 extern crate clap;
 extern crate failure;
 extern crate reqwest;
+extern crate rpassword;
 extern crate scraper;
 extern crate selectors;
 extern crate tokio;
 extern crate url;
 
 use itertools::Itertools;
+use reqwest::header::{HeaderMap, HeaderValue, COOKIE, SET_COOKIE};
 use selectors::Element;
+use std::collections::HashMap;
 use std::io::Write;
 
 enum SubCommand {
@@ -23,9 +26,18 @@ impl SubCommand {
     }
 }
 
+async fn call_get_request(url: &str) -> Result<reqwest::Response, reqwest::Error> {
+    let req = reqwest::Client::builder()
+        .build()
+        .unwrap()
+        .get(url)
+        .send()
+        .await?;
+    Ok(req)
+}
 async fn get_html(url: &str) -> Result<String, reqwest::Error> {
-    let res = reqwest::Client::new().get(url).send().await?;
-    let html = res.text().await?;
+    let req = call_get_request(url).await?;
+    let html = req.text().await?;
     Ok(html)
 }
 
@@ -34,9 +46,59 @@ fn parse_html(html: &str) -> scraper::Html {
     document
 }
 
+fn parse_token(document: &scraper::Html) -> Option<String> {
+    let selector = scraper::Selector::parse(r#"input[name="csrf_token"]"#).unwrap();
+    if let Some(element) = document.select(&selector).next() {
+        if let Some(token) = element.value().attr("value") {
+            return Some(token.to_string());
+        }
+    }
+    return None;
+}
+
 async fn login(url: &str) -> Result<(), failure::Error> {
     let url = url::Url::parse(url)?;
-    println!("{}", url);
+
+    let req = call_get_request(url.as_str()).await?;
+    let cookie_headers = req.headers().get_all(SET_COOKIE);
+    let mut headers = HeaderMap::new();
+    for header in cookie_headers.iter() {
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_str(&header.to_str().unwrap()).unwrap(),
+        );
+    }
+    let html = req.text().await?;
+    let document: scraper::Html = parse_html(&html);
+
+    let csrf_token = parse_token(&document).unwrap();
+    let username = "togatoga";
+    let password = rpassword::read_password_from_tty(Some("Password: ")).unwrap();
+
+    let mut params = HashMap::new();
+    params.insert("username", username);
+    params.insert("password", &password);
+    params.insert("csrf_token", &csrf_token);
+
+    println!("{:?}", params);
+    println!("{:?}", headers);
+    let request = reqwest::Client::builder()
+        .cookie_store(true)
+        .build()
+        .unwrap()
+        .post(url)
+        .headers(headers)
+        .form(&params)
+        .send()
+        .await?;
+    for header in request.headers().get_all(SET_COOKIE).iter() {
+        println!("{}", header.to_str().unwrap());
+    }
+
+    let html = request.text().await?;
+    println!("Done!!");
+    println!("{}", html);
+
     Ok(())
 }
 
