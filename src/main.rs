@@ -60,18 +60,19 @@ async fn login(url: &str) -> Result<(), failure::Error> {
     let url = url::Url::parse(url)?;
 
     let req = call_get_request(url.as_str()).await?;
-    let cookie_headers = req.headers().get_all(SET_COOKIE);
-    let mut headers = HeaderMap::new();
-    for header in cookie_headers.iter() {
-        headers.insert(
+    let cookies = req.cookies().collect::<Vec<_>>();
+    let mut cookie_headers = HeaderMap::new();
+    cookies.iter().for_each(|cookie| {
+        cookie_headers.insert(
             COOKIE,
-            HeaderValue::from_str(&header.to_str().unwrap()).unwrap(),
+            HeaderValue::from_str(&format!("{}={}", &cookie.name(), &cookie.value())).unwrap(),
         );
-    }
+    });
+
     let html = req.text().await?;
     let document: scraper::Html = parse_html(&html);
-
     let csrf_token = parse_token(&document).unwrap();
+
     let username = "togatoga";
     let password = rpassword::read_password_from_tty(Some("Password: ")).unwrap();
 
@@ -80,24 +81,15 @@ async fn login(url: &str) -> Result<(), failure::Error> {
     params.insert("password", &password);
     params.insert("csrf_token", &csrf_token);
 
-    println!("{:?}", params);
-    println!("{:?}", headers);
-    let request = reqwest::Client::builder()
+    let req: reqwest::Response = reqwest::Client::builder()
         .cookie_store(true)
         .build()
         .unwrap()
         .post(url)
-        .headers(headers)
+        .headers(cookie_headers)
         .form(&params)
         .send()
         .await?;
-    for header in request.headers().get_all(SET_COOKIE).iter() {
-        println!("{}", header.to_str().unwrap());
-    }
-
-    let html = request.text().await?;
-    println!("Done!!");
-    println!("{}", html);
 
     Ok(())
 }
