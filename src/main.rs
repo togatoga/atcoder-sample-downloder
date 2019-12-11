@@ -11,7 +11,7 @@ use itertools::Itertools;
 use reqwest::header::{HeaderMap, HeaderValue, COOKIE, SET_COOKIE};
 use selectors::Element;
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Read, Write};
 
 enum SubCommand {
     Download,
@@ -46,6 +46,11 @@ fn parse_html(html: &str) -> scraper::Html {
     document
 }
 
+fn get_csrf_token(html: &str) -> Option<String> {
+    let document: scraper::Html = parse_html(&html);
+    let csrf_token = parse_token(&document);
+    csrf_token
+}
 fn parse_token(document: &scraper::Html) -> Option<String> {
     let selector = scraper::Selector::parse(r#"input[name="csrf_token"]"#).unwrap();
     if let Some(element) = document.select(&selector).next() {
@@ -56,32 +61,41 @@ fn parse_token(document: &scraper::Html) -> Option<String> {
     return None;
 }
 
-async fn login(url: &str) -> Result<(), failure::Error> {
-    let url = url::Url::parse(url)?;
-
-    let req = call_get_request(url.as_str()).await?;
-    let cookies = req.cookies().collect::<Vec<_>>();
+fn get_cookie_headers(resp: &reqwest::Response) -> HeaderMap {
     let mut cookie_headers = HeaderMap::new();
+    let cookies = resp.cookies().collect::<Vec<_>>();
+
     cookies.iter().for_each(|cookie| {
         cookie_headers.insert(
             COOKIE,
             HeaderValue::from_str(&format!("{}={}", &cookie.name(), &cookie.value())).unwrap(),
         );
     });
+    cookie_headers
+}
 
-    let html = req.text().await?;
-    let document: scraper::Html = parse_html(&html);
-    let csrf_token = parse_token(&document).unwrap();
+fn get_username_and_password() -> (String, String) {
+    println!("Please input Your username and password");
+    let username = rpassword::read_password_from_tty(Some("Username > ")).unwrap();
+    let password = rpassword::read_password_from_tty(Some("Password > ")).unwrap();
+    (username, password)
+}
+async fn login(url: &str) -> Result<(), failure::Error> {
+    let url = url::Url::parse(url)?;
+    let resp = call_get_request(url.as_str()).await?;
 
-    let username = "togatoga";
-    let password = rpassword::read_password_from_tty(Some("Password: ")).unwrap();
-
+    //necessary information and parameters to login AtCoder
+    let cookie_headers = get_cookie_headers(&resp);
+    let html = resp.text().await?;
+    let csrf_token = get_csrf_token(&html).unwrap();
+    let (username, password) = get_username_and_password();
     let mut params = HashMap::new();
     params.insert("username", username);
-    params.insert("password", &password);
-    params.insert("csrf_token", &csrf_token);
+    params.insert("password", password);
+    params.insert("csrf_token", csrf_token);
 
-    let req: reqwest::Response = reqwest::Client::builder()
+    //make a post request and try to login
+    let resp: reqwest::Response = reqwest::Client::builder()
         .cookie_store(true)
         .build()
         .unwrap()
@@ -90,7 +104,8 @@ async fn login(url: &str) -> Result<(), failure::Error> {
         .form(&params)
         .send()
         .await?;
-
+    let html = resp.text().await?;
+    println!("{}", html);
     Ok(())
 }
 
