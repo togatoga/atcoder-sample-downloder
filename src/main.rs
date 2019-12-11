@@ -1,4 +1,5 @@
 extern crate clap;
+extern crate dirs;
 extern crate failure;
 extern crate reqwest;
 extern crate rpassword;
@@ -80,6 +81,15 @@ fn get_username_and_password() -> (String, String) {
     let password = rpassword::read_password_from_tty(Some("Password > ")).unwrap();
     (username, password)
 }
+
+fn save_cookie_in_local(cookies_str: &str) -> Result<(), failure::Error> {
+    let path = dirs::home_dir().unwrap().join(".atcoder-sample-downloader");
+    //create $HOME/.atcoder-sample-downloader
+    std::fs::create_dir(path.clone())?;
+    //create cookie.jar under this directory
+    std::fs::File::create(path.join("cookie.jar"))?.write_all(cookies_str.as_bytes());
+    Ok(())
+}
 async fn login(url: &str) -> Result<(), failure::Error> {
     let url = url::Url::parse(url)?;
     let resp = call_get_request(url.as_str()).await?;
@@ -104,6 +114,12 @@ async fn login(url: &str) -> Result<(), failure::Error> {
         .form(&params)
         .send()
         .await?;
+
+    let cookies_str = resp
+        .cookies()
+        .map(|cookie| format!("{}={}", cookie.name(), cookie.value()))
+        .join(";");
+    save_cookie_in_local(&cookies_str);
     let html = resp.text().await?;
     println!("{}", html);
     Ok(())

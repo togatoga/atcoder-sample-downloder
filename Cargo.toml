@@ -15,6 +15,7 @@ tokio = "0.2.0-alpha.6"
 selectors = "0.21.0"
 rpassword = "4.0"
 itertools = "0.8"
+dirs = "2.0"
 
 [dependencies.reqwest]
 git = "https://github.com/seanmonstar/reqwest"
