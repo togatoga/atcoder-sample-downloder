@@ -1,4 +1,5 @@
 extern crate clap;
+extern crate cookie;
 extern crate dirs;
 extern crate failure;
 extern crate reqwest;
@@ -9,10 +10,10 @@ extern crate tokio;
 extern crate url;
 
 use itertools::Itertools;
-use reqwest::header::{HeaderMap, HeaderValue, COOKIE, SET_COOKIE};
+use reqwest::header::{HeaderMap, HeaderValue, COOKIE};
 use selectors::Element;
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::{BufRead, Write};
 
 enum SubCommand {
     Download,
@@ -87,7 +88,7 @@ fn save_cookie_in_local(cookies_str: &str) -> Result<(), failure::Error> {
     //create $HOME/.atcoder-sample-downloader
     std::fs::create_dir(path.clone())?;
     //create cookie.jar under this directory
-    std::fs::File::create(path.join("cookie.jar"))?.write_all(cookies_str.as_bytes());
+    std::fs::File::create(path.join("cookie.jar"))?.write_all(cookies_str.as_bytes())?;
     Ok(())
 }
 async fn login(url: &str) -> Result<(), failure::Error> {
@@ -119,7 +120,7 @@ async fn login(url: &str) -> Result<(), failure::Error> {
         .cookies()
         .map(|cookie| format!("{}={}", cookie.name(), cookie.value()))
         .join(";");
-    save_cookie_in_local(&cookies_str);
+    save_cookie_in_local(&cookies_str)?;
     let html = resp.text().await?;
     println!("{}", html);
     Ok(())
@@ -185,7 +186,22 @@ fn parse_sample_cases(document: &scraper::Html) -> Result<Vec<(String, String)>,
     Ok(sample_test_cases)
 }
 
+fn get_local_cookies() -> Result<Vec<(String, String)>, failure::Error> {
+    let cookiejar_path = dirs::home_dir()
+        .unwrap()
+        .join(".atcoder-sample-downloader")
+        .join("cookie.jar");
+    let file = std::fs::File::open(cookiejar_path)?;
+    let reader = std::io::BufReader::new(file);
+    let mut cookies: Vec<(String, String)> = vec![];
+    for line in reader.lines() {
+        let (cookie_name, cookie_value) = cookie::Cookie::parse(line?)?.name_value();
+    }
+    Ok(cookies)
+}
+
 async fn download(url: &str) -> Result<(), failure::Error> {
+    let cookies = get_local_cookies();
     let url = url::Url::parse(url)?;
     let html = get_html(url.as_str()).await?;
     let document = parse_html(&html);
@@ -227,9 +243,12 @@ Example:
     //run sub commands
     if let Some(ref matched) = matches.subcommand_matches(&SubCommand::Download.value()) {
         match download(matched.value_of("url").unwrap()).await {
-            Ok(_) => {}
+            Ok(_) => {
+                std::process::exit(0);
+            }
             Err(e) => {
                 println!("{:?}", e);
+                std::process::exit(1);
             }
         }
     }
@@ -241,9 +260,12 @@ Example:
         )
         .await
         {
-            Ok(_) => {}
+            Ok(_) => {
+                std::process::exit(0);
+            }
             Err(e) => {
                 println!("{:?}", e);
+                std::process::exit(1);
             }
         }
     }
