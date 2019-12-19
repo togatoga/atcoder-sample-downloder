@@ -256,7 +256,7 @@ impl AtCoder {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), ()> {
     let matches = clap::App::new("atcoder-sample-downloader")
         .version("1.0")
         .author("Hitoshi Togasaki. <togasakitogatoga+github.com>")
@@ -316,4 +316,5 @@ Example:
             }
         }
     }
+    Ok(())
 }
