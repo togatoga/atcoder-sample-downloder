@@ -45,7 +45,6 @@ impl AtCoderParser {
             document: scraper::Html::parse_document(html),
         }
     }
-    //download
     fn sample_cases(&self) -> Option<Vec<(String, String)>> {
         let task_statement_selector =
             scraper::Selector::parse(r#"div[id="task-statement"]"#).unwrap();
@@ -73,7 +72,6 @@ impl AtCoderParser {
                 }
             }
         } else {
-            //return error
             return None;
         }
         // make cases unique to remove extra duplicated language cases
@@ -86,7 +84,7 @@ impl AtCoderParser {
             .collect();
         Some(sample_test_cases)
     }
-    //login
+
     fn csrf_token(&self) -> Option<String> {
         let selector = scraper::Selector::parse(r#"input[name="csrf_token"]"#).unwrap();
         if let Some(element) = self.document.select(&selector).next() {
@@ -150,7 +148,6 @@ impl AtCoder {
         };
         //make a post request and try to login
         let resp = self.call_post_request(url.as_str(), &params).await?;
-
         //save your cookie in your local
         AtCoder::save_cookie_in_local(&resp)?;
         Ok(())
@@ -199,11 +196,18 @@ impl AtCoder {
         for (idx, (input, output)) in test_cases.iter().enumerate() {
             //e.g sample_input_1.txt sample_output_1.txt
             let input_file_name = format!("sample_input_{}.txt", idx + 1);
-            let mut input_file = std::fs::File::create(input_file_name)?;
+
+            let mut input_file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(input_file_name)?;
             input_file.write_all(input.as_bytes())?;
 
             let output_file_name = format!("sample_output_{}.txt", idx + 1);
-            let mut output_file = std::fs::File::create(output_file_name)?;
+            let mut output_file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(output_file_name)?;
             output_file.write_all(output.as_bytes())?;
         }
         Ok(())
@@ -215,10 +219,14 @@ impl AtCoder {
             .join(";");
         let path = dirs::home_dir().unwrap().join(".atcoder-sample-downloader");
         //create $HOME/.atcoder-sample-downloader
-        std::fs::create_dir(path.clone())?;
+        std::fs::create_dir_all(path.clone())?;
         //create cookie.jar under this directory
         let cookie_path = path.join("cookie.jar");
-        std::fs::File::create(cookie_path.clone())?.write_all(cookies_str.as_bytes())?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(cookie_path.clone())?
+            .write_all(cookies_str.as_bytes())?;
         println!("SAVED YOUR COOKIE IN {}", cookie_path.to_str().unwrap());
         Ok(())
     }
@@ -238,11 +246,9 @@ impl AtCoder {
 
         let mut cookie_headers = HeaderMap::new();
         reader.lines().for_each(|line| {
-            let cookie = cookie::Cookie::parse(line.unwrap()).unwrap();
-            let (cookie_name, cookie_value) = cookie.name_value();
             cookie_headers.insert(
                 COOKIE,
-                HeaderValue::from_str(&format!("{}={}", cookie_name, cookie_value)).unwrap(),
+                HeaderValue::from_str(&format!("{}", line.unwrap())).unwrap(),
             );
         });
         Ok(cookie_headers)
