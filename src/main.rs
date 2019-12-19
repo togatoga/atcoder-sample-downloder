@@ -12,7 +12,6 @@ extern crate url;
 use itertools::Itertools;
 use reqwest::header::{HeaderMap, HeaderValue, COOKIE};
 use selectors::Element;
-use std::collections::HashMap;
 use std::io::{BufRead, Write};
 
 enum SubCommand {
@@ -46,7 +45,6 @@ impl AtCoderParser {
             document: scraper::Html::parse_document(html),
         }
     }
-
     //download
     fn sample_cases(&self) -> Option<Vec<(String, String)>> {
         let task_statement_selector =
@@ -131,7 +129,46 @@ impl AtCoder {
                 println!("Input:\n{}\nOutput:\n{}", input, output);
             }
         }
+        println!("=============================");
         Ok(())
+    }
+
+    pub async fn login(&mut self, url: &str) -> Result<(), failure::Error> {
+        let url = url::Url::parse(url)?;
+        let resp = self.call_get_request(url.as_str()).await?;
+        self.parse_response(resp).await?;
+        let parser = AtCoderParser::new(self.html.as_ref().unwrap());
+        //necessary information and parameters to login AtCoder
+        let csrf_token = parser.csrf_token().unwrap();
+        let (username, password) = AtCoder::username_and_password();
+        let params = {
+            let mut params = std::collections::HashMap::new();
+            params.insert("username", username);
+            params.insert("password", password);
+            params.insert("csrf_token", csrf_token);
+            params
+        };
+        //make a post request and try to login
+        let resp = self.call_post_request(url.as_str(), &params).await?;
+
+        //save your cookie in your local
+        AtCoder::save_cookie_in_local(&resp)?;
+        Ok(())
+    }
+
+    async fn call_post_request(
+        &self,
+        url: &str,
+        params: &std::collections::HashMap<&str, String>,
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        let resp = self
+            .client
+            .post(url)
+            .headers(self.cookie_headers.clone())
+            .form(params)
+            .send()
+            .await?;
+        Ok(resp)
     }
     async fn call_get_request(&self, url: &str) -> Result<reqwest::Response, reqwest::Error> {
         let resp = self
@@ -171,7 +208,26 @@ impl AtCoder {
         }
         Ok(())
     }
-
+    fn save_cookie_in_local(response: &reqwest::Response) -> Result<(), failure::Error> {
+        let cookies_str = response
+            .cookies()
+            .map(|cookie| format!("{}={}", cookie.name(), cookie.value()))
+            .join(";");
+        let path = dirs::home_dir().unwrap().join(".atcoder-sample-downloader");
+        //create $HOME/.atcoder-sample-downloader
+        std::fs::create_dir(path.clone())?;
+        //create cookie.jar under this directory
+        let cookie_path = path.join("cookie.jar");
+        std::fs::File::create(cookie_path.clone())?.write_all(cookies_str.as_bytes())?;
+        println!("SAVED YOUR COOKIE IN {}", cookie_path.to_str().unwrap());
+        Ok(())
+    }
+    fn username_and_password() -> (String, String) {
+        println!("Please input Your username and password");
+        let username = rpassword::read_password_from_tty(Some("Username > ")).unwrap();
+        let password = rpassword::read_password_from_tty(Some("Password > ")).unwrap();
+        (username, password)
+    }
     fn local_cookie_headers() -> Result<HeaderMap, failure::Error> {
         let cookiejar_path = dirs::home_dir()
             .unwrap()
@@ -192,80 +248,6 @@ impl AtCoder {
         Ok(cookie_headers)
     }
 }
-
-// fn get_username_and_password() -> (String, String) {
-//     println!("Please input Your username and password");
-//     let username = rpassword::read_password_from_tty(Some("Username > ")).unwrap();
-//     let password = rpassword::read_password_from_tty(Some("Password > ")).unwrap();
-//     (username, password)
-// }
-
-// fn save_cookie_in_local(cookies_str: &str) -> Result<(), failure::Error> {
-//     let path = dirs::home_dir().unwrap().join(".atcoder-sample-downloader");
-//     //create $HOME/.atcoder-sample-downloader
-//     std::fs::create_dir(path.clone())?;
-//     //create cookie.jar under this directory
-//     std::fs::File::create(path.join("cookie.jar"))?.write_all(cookies_str.as_bytes())?;
-//     Ok(())
-// }
-// async fn login(url: &str) -> Result<(), failure::Error> {
-//     let url = url::Url::parse(url)?;
-//     let resp = call_get_request(url.as_str()).await?;
-
-//     //necessary information and parameters to login AtCoder
-//     let cookie_headers = get_cookie_headers(&resp);
-//     let html = resp.text().await?;
-//     let csrf_token = get_csrf_token(&html).unwrap();
-//     let (username, password) = get_username_and_password();
-//     let mut params = HashMap::new();
-//     params.insert("username", username);
-//     params.insert("password", password);
-//     params.insert("csrf_token", csrf_token);
-
-//     //make a post request and try to login
-//     let resp: reqwest::Response = reqwest::Client::builder()
-//         .cookie_store(true)
-//         .build()
-//         .unwrap()
-//         .post(url)
-//         .headers(cookie_headers)
-//         .form(&params)
-//         .send()
-//         .await?;
-
-//     let cookies_str = resp
-//         .cookies()
-//         .map(|cookie| format!("{}={}", cookie.name(), cookie.value()))
-//         .join(";");
-//     save_cookie_in_local(&cookies_str)?;
-//     let html = resp.text().await?;
-//     println!("{}", html);
-//     Ok(())
-// }
-
-// fn create_sample_test_files(test_cases: &[(String, String)]) -> Result<(), failure::Error> {
-//     for (idx, (input, output)) in test_cases.iter().enumerate() {
-//         //e.g sample_input_1.txt sample_output_1.txt
-//         let input_file_name = format!("sample_input_{}.txt", idx + 1);
-//         let mut input_file = std::fs::File::create(input_file_name)?;
-//         input_file.write_all(input.as_bytes())?;
-
-//         let output_file_name = format!("sample_output_{}.txt", idx + 1);
-//         let mut output_file = std::fs::File::create(output_file_name)?;
-//         output_file.write_all(output.as_bytes())?;
-//     }
-//     Ok(())
-// }
-
-// async fn download(url: &str) -> Result<(), failure::Error> {
-//     let cookie_headers = get_local_cookie_headers();
-//     let url = url::Url::parse(url)?;
-//     let html = get_html(url.as_str()).await?;
-//     let document = parse_html(&html);
-//     let sample_test_cases = parse_sample_cases(&document)?;
-//     create_sample_test_files(&sample_test_cases)?;
-//     Ok(())
-// }
 
 #[tokio::main]
 async fn main() {
@@ -310,21 +292,22 @@ Example:
             }
         }
     }
-    // if let Some(ref matched) = matches.subcommand_matches(&SubCommand::Login.value()) {
-    //     match login(
-    //         matched
-    //             .value_of("url")
-    //             .unwrap_or("https://atcoder.jp/login"),
-    //     )
-    //     .await
-    //     {
-    //         Ok(_) => {
-    //             std::process::exit(0);
-    //         }
-    //         Err(e) => {
-    //             println!("{:?}", e);
-    //             std::process::exit(1);
-    //         }
-    //     }
-    // }
+    if let Some(ref matched) = matches.subcommand_matches(&SubCommand::Login.value()) {
+        match atcoder
+            .login(
+                matched
+                    .value_of("url")
+                    .unwrap_or("https://atcoder.jp/login"),
+            )
+            .await
+        {
+            Ok(_) => {
+                std::process::exit(0);
+            }
+            Err(e) => {
+                println!("{:?}", e);
+                std::process::exit(1);
+            }
+        }
+    }
 }
