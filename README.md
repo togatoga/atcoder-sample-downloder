@@ -9,13 +9,13 @@ cargo install --git https://github.com/togatoga/atcoder-sample-downloder
 ## How to use
 atcoder-sample-downloader has two main subcommands, `download` and `login`.
 
-A subcommand `download` is downloading sample test cases of AtCoder problem from an AtCoder URL.
+A subcommand `download` is to download sample test cases of AtCoder problem from an AtCoder URL.
 ```
 //download
 $ atcoder-sample-downloder download https://atcoder.jp/contests/abc147/tasks/ab
 
 ```
-A subcommand `login` is login AtCoder and save your cookie in your local.
+A subcommand `login` is to login AtCoder and save your cookie in your local.
 ```
 $ atcoder-sample-downloder login
 Please input Your username and password
