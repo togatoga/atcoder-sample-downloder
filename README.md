@@ -1,6 +1,8 @@
 # atcoder-sample-downloder
 atcoder-sample-downloder is command line tool for downloading sample tests cases of AtCoder problem.
 
+Qiita:[RustでAtCoderのサンプルケースを自動取得する](https://qiita.com/togatoga/items/d4a9ffb30e3ae6731871)
+
 ## How to install
 ```
 cargo install --git https://github.com/togatoga/atcoder-sample-downloder
